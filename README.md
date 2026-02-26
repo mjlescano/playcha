@@ -240,7 +240,7 @@ FlareSolverr downloads and patches ChromeDriver at runtime (undetected-chromedri
 
 ### Image size
 
-Chromium plus ChromeDriver in the FlareSolverr Docker image accounts for roughly 400–500 MB. Camoufox's Firefox build is more compact, and since Playwright communicates directly with the browser (no separate driver binary), the total browser footprint is smaller.
+The Docker image uses dummy packages (a la FlareSolverr) to skip pulling heavy transitive dependencies like `libgl1-mesa-dri` and `adwaita-icon-theme` that are unnecessary for headless operation, saving roughly 200 MB compared to a naive install. Camoufox's Firefox build is comparable to FlareSolverr's Chromium footprint, and since Playwright communicates directly with the browser (no separate driver binary), there is no additional driver overhead.
 
 ## License
 

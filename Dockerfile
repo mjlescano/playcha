@@ -1,5 +1,19 @@
 # =============================================================================
-# Stage 1 — Build the PyInstaller binary and collect the Camoufox browser
+# Stage 1 — Build dummy packages to skip heavy unused dependencies
+# =============================================================================
+FROM debian:bookworm-slim AS dummies
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends equivs \
+    && equivs-control libgl1-mesa-dri \
+    && printf 'Section: misc\nPriority: optional\nStandards-Version: 3.9.2\nPackage: libgl1-mesa-dri\nVersion: 99.0.0\nDescription: dummy\n' >> libgl1-mesa-dri \
+    && equivs-build libgl1-mesa-dri \
+    && equivs-control adwaita-icon-theme \
+    && printf 'Section: misc\nPriority: optional\nStandards-Version: 3.9.2\nPackage: adwaita-icon-theme\nVersion: 99.0.0\nDescription: dummy\n' >> adwaita-icon-theme \
+    && equivs-build adwaita-icon-theme
+
+# =============================================================================
+# Stage 2 — Build the PyInstaller binary and collect the Camoufox browser
 # =============================================================================
 FROM python:3.12-slim-bookworm AS builder
 
@@ -74,7 +88,7 @@ RUN cp -r /root/.cache/camoufox /dist/camoufox
 
 
 # =============================================================================
-# Stage 2 — Minimal runtime image
+# Stage 3 — Minimal runtime image
 # =============================================================================
 FROM debian:bookworm-slim
 
@@ -84,7 +98,11 @@ LABEL org.opencontainers.image.source="https://github.com/mjlescano/playcha" \
       org.opencontainers.image.version="$VERSION" \
       org.opencontainers.image.revision="$REVISION"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+COPY --from=dummies /*.deb /tmp/
+
+RUN dpkg -i /tmp/libgl1-mesa-dri*.deb /tmp/adwaita-icon-theme*.deb \
+    && rm /tmp/*.deb \
+    && apt-get update && apt-get install -y --no-install-recommends \
         libgtk-3-0 \
         libx11-xcb1 \
         libxcomposite1 \
