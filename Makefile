@@ -44,6 +44,7 @@ docker-build:
 version:
 	@BMP="$(firstword $(filter-out version,$(MAKECMDGOALS)))"; \
 	if [ -z "$$BMP" ]; then echo "Usage: make version patch|minor|major|X.Y.Z"; exit 1; fi; \
+	if [ -n "$$(git status --porcelain)" ]; then echo "Error: working tree has uncommitted changes"; exit 1; fi; \
 	CURRENT=$$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/'); \
 	if echo "$$BMP" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 	  NEW="$$BMP"; \
@@ -53,6 +54,7 @@ version:
 	fi; \
 	sed -i.bak "s/^version = \".*\"/version = \"$$NEW\"/" pyproject.toml && rm -f pyproject.toml.bak; \
 	sed -i.bak "s/\([[:space:]]*__version__ = \)\".*\"/\1\"$$NEW-dev\"/" src/playcha/__init__.py && rm -f src/playcha/__init__.py.bak; \
+	git add pyproject.toml src/playcha/__init__.py && git commit -m "Bump version to $$NEW"; \
 	echo "Version set to $$NEW"
 
 # Catch-all so "make version patch" doesn't try to build target "patch"
