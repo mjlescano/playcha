@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "playcha"
-version = "0.0.3"
+version = "0.0.4"
 description = "FlareSolverr-compatible API using Playwright + Camoufox for challenge solving"
 readme = "README.md"
 license = {text = "MIT"}
