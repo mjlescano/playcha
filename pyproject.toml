@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "playcha"
-version = "1.0.0"
+version = "0.0.1"
 description = "FlareSolverr-compatible API using Playwright + Camoufox for challenge solving"
 readme = "README.md"
 license = {text = "MIT"}
@@ -18,6 +18,9 @@ dependencies = [
     "playwright-captcha",
     "2captcha-python-async",
 ]
+
+[project.scripts]
+playcha = "playcha.app:main"
 
 [project.optional-dependencies]
 dev = [

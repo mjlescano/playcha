@@ -1,5 +1,4 @@
-.PHONY: dev lint fix format check test install install-dev fetch-browser \
-       docker-build docker-build-binary docker-build-builder
+.PHONY: dev lint fix format check test install install-dev fetch-browser docker-build
 
 # Install production dependencies
 install:
@@ -37,14 +36,6 @@ check: lint
 test:
 	PYTHONPATH=src pytest tests/ -v
 
-# Build the standard Docker image
+# Build the Docker image
 docker-build:
 	docker build -t playcha .
-
-# Build the PyInstaller-based standalone binary image
-docker-build-binary:
-	docker build -f Dockerfile.binary -t playcha-binary .
-
-# Build only the builder stage (for extracting binaries to embed in other images)
-docker-build-builder:
-	docker build -f Dockerfile.binary --target builder -t playcha-builder .

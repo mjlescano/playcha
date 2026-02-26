@@ -1,6 +1,80 @@
-FROM python:3.12-slim-bookworm
+# =============================================================================
+# Stage 1 — Build the PyInstaller binary and collect the Camoufox browser
+# =============================================================================
+FROM python:3.12-slim-bookworm AS builder
 
-# System dependencies for Camoufox (Firefox) and Xvfb
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libgtk-3-0 \
+        libx11-xcb1 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxrandr2 \
+        libasound2 \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libdbus-1-3 \
+        libxkbcommon0 \
+        libxshmfence1 \
+        libgbm1 \
+        xvfb \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt pyinstaller
+
+# Download the Camoufox browser
+RUN python -m camoufox fetch
+
+COPY src/ src/
+
+# Create the PyInstaller entrypoint wrapper
+RUN printf 'from playcha.app import main\nmain()\n' > entrypoint.py
+
+# Build the single-directory bundle
+RUN PYTHONPATH=src pyinstaller \
+        --noconfirm \
+        --clean \
+        --name playcha \
+        --paths src \
+        --hidden-import playcha \
+        --hidden-import playcha.app \
+        --hidden-import playcha.config \
+        --hidden-import playcha.dtos \
+        --hidden-import playcha.sessions \
+        --hidden-import playcha.solver \
+        --hidden-import uvicorn \
+        --hidden-import uvicorn.logging \
+        --hidden-import uvicorn.loops \
+        --hidden-import uvicorn.loops.auto \
+        --hidden-import uvicorn.protocols \
+        --hidden-import uvicorn.protocols.http \
+        --hidden-import uvicorn.protocols.http.auto \
+        --hidden-import uvicorn.protocols.websockets \
+        --hidden-import uvicorn.protocols.websockets.auto \
+        --hidden-import uvicorn.lifespan \
+        --hidden-import uvicorn.lifespan.on \
+        --collect-all playwright_captcha \
+        --collect-all camoufox \
+        entrypoint.py
+
+RUN mkdir -p /dist && mv dist/playcha /dist/playcha
+
+# Copy the Camoufox browser files
+RUN cp -r /root/.cache/camoufox /dist/camoufox
+
+
+# =============================================================================
+# Stage 2 — Minimal runtime image
+# =============================================================================
+FROM debian:bookworm-slim
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libgtk-3-0 \
         libx11-xcb1 \
@@ -20,36 +94,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libgbm1 \
         xvfb \
         dumb-init \
-        procps \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+COPY --from=builder /dist/playcha /opt/playcha
+COPY --from=builder /dist/camoufox /opt/camoufox
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN useradd --home-dir /opt/playcha --shell /bin/sh playcha \
+    && mkdir -p /opt/playcha/.cache \
+    && ln -s /opt/camoufox /opt/playcha/.cache/camoufox \
+    && chown -R playcha:playcha /opt/playcha
 
-# Download the Camoufox browser binary
-RUN python -m camoufox fetch
+USER playcha
 
-# Create non-root user and move Camoufox cache to its home
-RUN useradd --home-dir /app --shell /bin/sh playcha \
-    && mkdir -p /app/.cache \
-    && cp -r /root/.cache/camoufox /app/.cache/camoufox \
-    && chown -R playcha:playcha /app
-
-# Copy source
-COPY src/ src/
-
-ENV PYTHONPATH=/app/src
 ENV PORT=8191
 ENV HOST=0.0.0.0
 ENV LOG_LEVEL=info
 ENV HEADLESS=true
-
-USER playcha
+ENV CAMOUFOX_PATH=/opt/camoufox
 
 EXPOSE 8191
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["python", "-m", "playcha"]
+CMD ["/opt/playcha/playcha"]

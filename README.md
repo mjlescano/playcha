@@ -167,20 +167,9 @@ All commands are sent as JSON to `POST /v1`.
 | `CAPTCHA_AI_API_KEY` | — | API key for CaptchaAI solver |
 | `TZ` | `UTC` | Timezone |
 
-## Embedding as Portable Binaries
+## Embedding in Another Docker Image
 
-Playcha can be compiled into standalone binaries suitable for embedding into other Docker images. The binaries are **Linux x86_64 only** — they are built inside a Debian container and cannot run on macOS, Windows, or ARM architectures. This produces two artifacts:
-
-- **`playcha`** — the application binary (PyInstaller bundle)
-- **`camoufox/`** — the Camoufox browser files
-
-### Build the binaries
-
-```bash
-docker build -f Dockerfile.binary --target builder -t playcha-builder .
-```
-
-### Use in your own Dockerfile
+The published Docker image contains pre-compiled binaries (**Linux x86_64 only**) that can be copied directly into your own image:
 
 ```dockerfile
 FROM your-base-image
@@ -191,11 +180,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 libpango-1.0-0 libatk1.0-0 libatk-bridge2.0-0 \
     libcups2 libdrm2 libdbus-1-3 libxkbcommon0 libgbm1 xvfb
 
-# Copy Playcha binaries from the builder
-COPY --from=playcha-builder /dist/playcha /usr/local/bin/playcha
-COPY --from=playcha-builder /dist/camoufox /opt/camoufox
+# Copy binaries from the published image
+COPY --from=ghcr.io/mjlescano/playcha:latest /opt/playcha /usr/local/bin/playcha
+COPY --from=ghcr.io/mjlescano/playcha:latest /opt/camoufox /opt/camoufox
 
 ENV CAMOUFOX_PATH=/opt/camoufox
+```
+
+Or build locally and copy from the builder stage:
+
+```bash
+docker build --target builder -t playcha-builder .
+```
+
+```dockerfile
+COPY --from=playcha-builder /dist/playcha /usr/local/bin/playcha
+COPY --from=playcha-builder /dist/camoufox /opt/camoufox
 ```
 
 ## Development
