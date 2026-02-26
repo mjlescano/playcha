@@ -15,17 +15,17 @@ jobs:
       should_release: ${{ steps.check.outputs.should_release }}
       version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v6
 
       - name: Check version against latest tag
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[].name' | grep '^v' | sort -V | tail -n1)
           if [ "v$VERSION" = "$LATEST_TAG" ]; then
             echo "Version v$VERSION already released"
             echo "should_release=false" >> "$GITHUB_OUTPUT"
@@ -41,7 +41,7 @@ jobs:
     env:
       VERSION: ${{ needs.check-version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
