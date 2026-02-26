@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -76,7 +77,7 @@ async def launch_browser(
     second context.
     """
     headless: bool | str = settings.headless
-    if headless and os.name != "nt":
+    if headless and sys.platform == "linux":
         headless = "virtual"
 
     kwargs: dict[str, Any] = {
