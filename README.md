@@ -169,7 +169,7 @@ All commands are sent as JSON to `POST /v1`.
 
 ## Embedding as Portable Binaries
 
-Playcha can be compiled into standalone binaries suitable for embedding into other Docker images. This produces two artifacts:
+Playcha can be compiled into standalone binaries suitable for embedding into other Docker images. The binaries are **Linux x86_64 only** — they are built inside a Debian container and cannot run on macOS, Windows, or ARM architectures. This produces two artifacts:
 
 - **`playcha`** — the application binary (PyInstaller bundle)
 - **`camoufox/`** — the Camoufox browser files

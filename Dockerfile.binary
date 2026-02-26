@@ -64,7 +64,7 @@ RUN PYTHONPATH=src pyinstaller \
         --collect-all camoufox \
         entrypoint.py
 
-RUN mv dist/playcha /dist/playcha
+RUN mkdir -p /dist && mv dist/playcha /dist/playcha
 
 # Copy the Camoufox browser files
 RUN cp -r /root/.cache/camoufox /dist/camoufox
