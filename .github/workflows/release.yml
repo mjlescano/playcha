@@ -58,6 +58,9 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            REVISION=${{ github.sha }}
           tags: |
             ghcr.io/mjlescano/playcha:v${{ env.VERSION }}
             ghcr.io/mjlescano/playcha:latest
