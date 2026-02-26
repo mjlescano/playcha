@@ -205,29 +205,26 @@ async def _get_api_solver(page: Any) -> Any:
         return TwoCaptchaSolver(framework=FRAMEWORK, page=page, async_two_captcha_client=client)
 
     if solver_type == CaptchaSolverType.TENCAPTCHA:
-        from playwright_captcha.solvers.api.tencaptcha.tencaptcha_solver import (
-            TenCaptchaSolver,
-        )
-
         if not settings.ten_captcha_api_key:
             raise Exception("TEN_CAPTCHA_API_KEY is required for tencaptcha solver.")
-        # TenCaptcha follows the same client pattern
         try:
-            from tencaptcha import AsyncTenCaptcha
+            from playwright_captcha.solvers.api.tencaptcha.tencaptcha_solver import (  # type: ignore[import-not-found]
+                TenCaptchaSolver,
+            )
+            from tencaptcha import AsyncTenCaptcha  # type: ignore[import-not-found]
         except ImportError as err:
             raise Exception("Install tencaptcha package for tencaptcha solver.") from err
         client = AsyncTenCaptcha(settings.ten_captcha_api_key)
         return TenCaptchaSolver(framework=FRAMEWORK, page=page, async_ten_captcha_client=client)
 
     if solver_type == CaptchaSolverType.CAPTCHAAI:
-        from playwright_captcha.solvers.api.captchaai.captchaai_solver import (
-            CaptchaAISolver,
-        )
-
         if not settings.captcha_ai_api_key:
             raise Exception("CAPTCHA_AI_API_KEY is required for captchaai solver.")
         try:
-            from captchaai import AsyncCaptchaAI
+            from captchaai import AsyncCaptchaAI  # type: ignore[import-not-found]
+            from playwright_captcha.solvers.api.captchaai.captchaai_solver import (  # type: ignore[import-not-found]
+                CaptchaAISolver,
+            )
         except ImportError as err:
             raise Exception("Install captchaai package for captchaai solver.") from err
         client = AsyncCaptchaAI(settings.captcha_ai_api_key)
