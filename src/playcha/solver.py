@@ -3,16 +3,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from playwright_captcha import CaptchaType, ClickSolver, FrameworkType
 
 from .config import CaptchaSolverType, settings
 from .dtos import (
-    STATUS_ERROR,
     STATUS_OK,
     CookieResponse,
-    ProxyRequest,
     Solution,
     V1Request,
     V1Response,
@@ -63,6 +61,7 @@ FRAMEWORK = FrameworkType.CAMOUFOX
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def _elements_exist(page: Any, selectors: list[str]) -> bool:
     for sel in selectors:
@@ -167,15 +166,13 @@ async def _get_api_solver(page: Any) -> Any:
     solver_type = settings.captcha_solver
 
     if solver_type == CaptchaSolverType.TWOCAPTCHA:
-        from twocaptcha import AsyncTwoCaptcha
         from playwright_captcha import TwoCaptchaSolver
+        from twocaptcha import AsyncTwoCaptcha
 
         if not settings.two_captcha_api_key:
             raise Exception("TWO_CAPTCHA_API_KEY is required for twocaptcha solver.")
         client = AsyncTwoCaptcha(settings.two_captcha_api_key)
-        return TwoCaptchaSolver(
-            framework=FRAMEWORK, page=page, async_two_captcha_client=client
-        )
+        return TwoCaptchaSolver(framework=FRAMEWORK, page=page, async_two_captcha_client=client)
 
     if solver_type == CaptchaSolverType.TENCAPTCHA:
         from playwright_captcha.solvers.api.tencaptcha.tencaptcha_solver import (
@@ -187,12 +184,10 @@ async def _get_api_solver(page: Any) -> Any:
         # TenCaptcha follows the same client pattern
         try:
             from tencaptcha import AsyncTenCaptcha
-        except ImportError:
-            raise Exception("Install tencaptcha package for tencaptcha solver.")
+        except ImportError as err:
+            raise Exception("Install tencaptcha package for tencaptcha solver.") from err
         client = AsyncTenCaptcha(settings.ten_captcha_api_key)
-        return TenCaptchaSolver(
-            framework=FRAMEWORK, page=page, async_ten_captcha_client=client
-        )
+        return TenCaptchaSolver(framework=FRAMEWORK, page=page, async_ten_captcha_client=client)
 
     if solver_type == CaptchaSolverType.CAPTCHAAI:
         from playwright_captcha.solvers.api.captchaai.captchaai_solver import (
@@ -203,12 +198,10 @@ async def _get_api_solver(page: Any) -> Any:
             raise Exception("CAPTCHA_AI_API_KEY is required for captchaai solver.")
         try:
             from captchaai import AsyncCaptchaAI
-        except ImportError:
-            raise Exception("Install captchaai package for captchaai solver.")
+        except ImportError as err:
+            raise Exception("Install captchaai package for captchaai solver.") from err
         client = AsyncCaptchaAI(settings.captcha_ai_api_key)
-        return CaptchaAISolver(
-            framework=FRAMEWORK, page=page, async_captcha_ai_client=client
-        )
+        return CaptchaAISolver(framework=FRAMEWORK, page=page, async_captcha_ai_client=client)
 
     return None
 
@@ -227,6 +220,7 @@ def _guess_captcha_type(page_title: str, has_turnstile: bool) -> CaptchaType:
 # Core resolution
 # ---------------------------------------------------------------------------
 
+
 async def resolve_challenge(
     req: V1Request,
     method: str,
@@ -241,14 +235,8 @@ async def resolve_challenge(
         if req.session:
             from datetime import timedelta
 
-            ttl = (
-                timedelta(minutes=req.session_ttl_minutes)
-                if req.session_ttl_minutes
-                else None
-            )
-            session, fresh = await sessions.get(
-                req.session, ttl=ttl, proxy=req.proxy
-            )
+            ttl = timedelta(minutes=req.session_ttl_minutes) if req.session_ttl_minutes else None
+            session, fresh = await sessions.get(req.session, ttl=ttl, proxy=req.proxy)
             page = session.page
             session_id = session.session_id
             log.debug(
@@ -299,16 +287,12 @@ async def resolve_challenge(
                             ),
                             timeout=timeout_s,
                         )
-                    except asyncio.TimeoutError:
-                        raise Exception(
-                            f"Timeout after {timeout_s}s solving challenge."
-                        )
+                    except TimeoutError as err:
+                        raise Exception(f"Timeout after {timeout_s}s solving challenge.") from err
             else:
                 api_solver = await _get_api_solver(page)
                 if api_solver is None:
-                    raise Exception(
-                        f"No solver configured for type {settings.captcha_solver}"
-                    )
+                    raise Exception(f"No solver configured for type {settings.captcha_solver}")
                 async with api_solver:
                     try:
                         result = await asyncio.wait_for(
@@ -320,10 +304,8 @@ async def resolve_challenge(
                         )
                         if isinstance(result, str):
                             turnstile_token = result
-                    except asyncio.TimeoutError:
-                        raise Exception(
-                            f"Timeout after {timeout_s}s solving challenge."
-                        )
+                    except TimeoutError as err:
+                        raise Exception(f"Timeout after {timeout_s}s solving challenge.") from err
 
             # Wait for challenge artifacts to disappear
             try:

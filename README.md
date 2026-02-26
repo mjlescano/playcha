@@ -36,6 +36,14 @@ docker build -t playcha .
 Requires Python 3.12+.
 
 ```bash
+make install          # install dependencies
+make fetch-browser    # download the Camoufox browser binary
+make dev              # start the server
+```
+
+Or without Make:
+
+```bash
 pip install -r requirements.txt
 python -m camoufox fetch
 python -m playcha
@@ -188,6 +196,16 @@ COPY --from=playcha-builder /dist/playcha /usr/local/bin/playcha
 COPY --from=playcha-builder /dist/camoufox /opt/camoufox
 
 ENV CAMOUFOX_PATH=/opt/camoufox
+```
+
+## Development
+
+```bash
+make install-dev      # install package in editable mode with dev deps (ruff, pytest)
+make lint             # check for lint errors
+make fix              # auto-fix lint errors
+make format           # format code
+make check            # lint + format check (useful for CI)
 ```
 
 ## Migrating from FlareSolverr

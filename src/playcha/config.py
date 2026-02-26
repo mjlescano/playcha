@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import os
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
-class CaptchaSolverType(str, Enum):
+class CaptchaSolverType(StrEnum):
     CLICK = "click"
     TWOCAPTCHA = "twocaptcha"
     TENCAPTCHA = "tencaptcha"
@@ -21,16 +20,16 @@ class Settings(BaseSettings):
     log_level: str = Field(default="info")
 
     headless: bool = Field(default=True)
-    camoufox_path: Optional[str] = Field(default=None)
+    camoufox_path: str | None = Field(default=None)
 
-    proxy_url: Optional[str] = Field(default=None)
-    proxy_username: Optional[str] = Field(default=None)
-    proxy_password: Optional[str] = Field(default=None)
+    proxy_url: str | None = Field(default=None)
+    proxy_username: str | None = Field(default=None)
+    proxy_password: str | None = Field(default=None)
 
     captcha_solver: CaptchaSolverType = Field(default=CaptchaSolverType.CLICK)
-    two_captcha_api_key: Optional[str] = Field(default=None)
-    ten_captcha_api_key: Optional[str] = Field(default=None)
-    captcha_ai_api_key: Optional[str] = Field(default=None)
+    two_captcha_api_key: str | None = Field(default=None)
+    ten_captcha_api_key: str | None = Field(default=None)
+    captcha_ai_api_key: str | None = Field(default=None)
 
     tz: str = Field(default="UTC")
 

@@ -4,7 +4,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from camoufox.async_api import AsyncCamoufox
@@ -13,7 +13,9 @@ from playwright_captcha.utils.camoufox_add_init_script.add_init_script import (
 )
 
 from .config import settings
-from .dtos import ProxyRequest
+
+if TYPE_CHECKING:
+    from .dtos import ProxyRequest
 
 log = logging.getLogger(__name__)
 

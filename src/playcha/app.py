@@ -42,6 +42,7 @@ app = FastAPI(title="Playcha", version=__version__, lifespan=lifespan)
 # Routes
 # ---------------------------------------------------------------------------
 
+
 @app.get("/")
 async def index():
     return IndexResponse(
@@ -82,6 +83,7 @@ async def controller_v1(req: V1Request):
 # Command dispatcher
 # ---------------------------------------------------------------------------
 
+
 async def _handle_v1(req: V1Request) -> V1Response:
     if not req.cmd:
         raise Exception("Request parameter 'cmd' is mandatory.")
@@ -113,10 +115,9 @@ async def _handle_v1(req: V1Request) -> V1Response:
 # Session commands
 # ---------------------------------------------------------------------------
 
+
 async def _cmd_sessions_create(req: V1Request) -> V1Response:
-    session, fresh = await SESSIONS.create(
-        session_id=req.session, proxy=req.proxy
-    )
+    session, fresh = await SESSIONS.create(session_id=req.session, proxy=req.proxy)
     return V1Response(
         status=STATUS_OK,
         message="Session created successfully." if fresh else "Session already exists.",
@@ -148,6 +149,7 @@ async def _cmd_sessions_destroy(req: V1Request) -> V1Response:
 # Request commands
 # ---------------------------------------------------------------------------
 
+
 async def _cmd_request_get(req: V1Request) -> V1Response:
     if not req.url:
         raise Exception("Request parameter 'url' is mandatory in 'request.get' command.")
@@ -167,6 +169,7 @@ async def _cmd_request_post(req: V1Request) -> V1Response:
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     log_level = settings.log_level.upper()
