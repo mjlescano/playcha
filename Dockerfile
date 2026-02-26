@@ -75,6 +75,12 @@ RUN cp -r /root/.cache/camoufox /dist/camoufox
 # =============================================================================
 FROM debian:bookworm-slim
 
+ARG VERSION=dev
+ARG REVISION=
+LABEL org.opencontainers.image.source="https://github.com/mjlescano/playcha" \
+      org.opencontainers.image.version="$VERSION" \
+      org.opencontainers.image.revision="$REVISION"
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libgtk-3-0 \
         libx11-xcb1 \
