@@ -1,0 +1,5 @@
+*
+!src/
+!Makefile
+!pyproject.toml
+!requirements.txt
