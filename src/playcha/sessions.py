@@ -84,6 +84,8 @@ async def launch_browser(
         "headless": headless,
         "humanize": True,
         "main_world_eval": True,
+        "disable_coop": True,
+        "i_know_what_im_doing": True,
         "addons": [os.path.abspath(ADDON_PATH)],
     }
 

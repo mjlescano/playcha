@@ -1,8 +1,8 @@
 # Playcha
 
-A FlareSolverr-compatible proxy server for bypassing Cloudflare and other browser challenges, built on **Playwright + Camoufox** instead of Selenium + undetected-chromedriver.
+Wrapper proxy server for [https://github.com/techinz/playwright-captcha](https://github.com/techinz/playwright-captcha), used for bypassing Cloudflare and other browser challenges, built on **Playwright + Camoufox**.
 
-Drop-in replacement API — same `POST /v1` interface, same request/response shapes — so migrating from FlareSolverr is a one-line URL change.
+Playcha is [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) compatible proxy server drop-in replacement — same `POST /v1` interface, same request/response shapes — so migrating from FlareSolverr is a one-line URL change.
 
 > **Warning:** This project is not production ready. It is in an early experimental stage and has not been thoroughly tested against real-world Cloudflare challenges. APIs, configuration, and behavior may change without notice. Use at your own risk.
 
