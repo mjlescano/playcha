@@ -23,7 +23,9 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pytest-timeout",
     "httpx",
+    "aiohttp",
     "ruff",
 ]
 binary = [
@@ -32,6 +34,11 @@ binary = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+timeout = 120
+testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py312"
@@ -54,7 +61,7 @@ select = [
 ignore = [
     "E501",  # line length handled by formatter
 ]
-per-file-ignores = {"src/playcha/dtos.py" = ["N815"]}  # camelCase fields required for FlareSolverr compat
+per-file-ignores = {"src/playcha/dtos.py" = ["N815"], "tests/**" = ["N815"]}  # camelCase fields required for FlareSolverr compat
 
 [tool.ruff.lint.isort]
 known-first-party = ["playcha"]

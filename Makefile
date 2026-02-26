@@ -1,4 +1,4 @@
-.PHONY: dev lint fix format check install install-dev fetch-browser \
+.PHONY: dev lint fix format check test install install-dev fetch-browser \
        docker-build docker-build-binary docker-build-builder
 
 # Install production dependencies
@@ -19,19 +19,23 @@ dev:
 
 # Run linter
 lint:
-	ruff check src/
+	ruff check src/ tests/
 
 # Run linter with auto-fix
 fix:
-	ruff check --fix src/
+	ruff check --fix src/ tests/
 
 # Format source code
 format:
-	ruff format src/
+	ruff format src/ tests/
 
 # Run linter and check formatting (CI)
 check: lint
-	ruff format --check src/
+	ruff format --check src/ tests/
+
+# Run integration tests
+test:
+	PYTHONPATH=src pytest tests/ -v
 
 # Build the standard Docker image
 docker-build:

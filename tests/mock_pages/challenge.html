@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Just a moment...</title>
+</head>
+<body>
+    <div id="cf-challenge-running">
+        <p>Checking your browser...</p>
+    </div>
+    <div id="result" style="display:none;">
+        <p id="content">Challenge passed!</p>
+    </div>
+    <script>
+        setTimeout(function() {
+            document.getElementById('cf-challenge-running').remove();
+            document.getElementById('result').style.display = 'block';
+            document.title = 'Test Page - Solved';
+        }, 1000);
+    </script>
+</body>
+</html>
