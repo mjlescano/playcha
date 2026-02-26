@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "playcha"
+version = "1.0.0"
+description = "FlareSolverr-compatible API using Playwright + Camoufox for challenge solving"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "camoufox[geoip]",
+    "playwright-captcha",
+    "2captcha-python-async",
+    "aiofiles",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+]
+binary = [
+    "pyinstaller",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

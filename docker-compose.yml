@@ -1,0 +1,16 @@
+services:
+  playcha:
+    build: .
+    container_name: playcha
+    ports:
+      - "8191:8191"
+    environment:
+      - LOG_LEVEL=info
+      - HEADLESS=true
+      - TZ=UTC
+      # - CAPTCHA_SOLVER=click
+      # - TWO_CAPTCHA_API_KEY=
+      # - PROXY_URL=
+      # - PROXY_USERNAME=
+      # - PROXY_PASSWORD=
+    restart: unless-stopped
