@@ -1,6 +1,6 @@
 services:
   playcha:
-    build: .
+    image: ghcr.io/mjlescano/playcha:latest
     container_name: playcha
     ports:
       - "8191:8191"

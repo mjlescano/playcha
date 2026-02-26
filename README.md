@@ -10,6 +10,8 @@ Drop-in replacement API — same `POST /v1` interface, same request/response sha
 
 ### Docker (recommended)
 
+Uses the [published image](https://github.com/mjlescano/playcha/pkgs/container/playcha) from GitHub Container Registry.
+
 ```bash
 docker compose up -d
 ```
@@ -22,13 +24,7 @@ docker run -d \
   -p 8191:8191 \
   -e LOG_LEVEL=info \
   --restart unless-stopped \
-  playcha
-```
-
-Build the image first:
-
-```bash
-docker build -t playcha .
+  ghcr.io/mjlescano/playcha:latest
 ```
 
 ### From source
@@ -51,7 +47,7 @@ python -m playcha
 
 ## Usage
 
-Playcha exposes the same API as FlareSolverr. Point your existing client at Playcha and it will work without code changes.
+Playcha exposes the same API as [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr). Point your existing client at Playcha and it will work without code changes.
 
 ### Example: GET request
 
@@ -185,17 +181,6 @@ COPY --from=ghcr.io/mjlescano/playcha:latest /opt/playcha /usr/local/bin/playcha
 COPY --from=ghcr.io/mjlescano/playcha:latest /opt/camoufox /opt/camoufox
 
 ENV CAMOUFOX_PATH=/opt/camoufox
-```
-
-Or build locally and copy from the builder stage:
-
-```bash
-docker build --target builder -t playcha-builder .
-```
-
-```dockerfile
-COPY --from=playcha-builder /dist/playcha /usr/local/bin/playcha
-COPY --from=playcha-builder /dist/camoufox /opt/camoufox
 ```
 
 ## Development
