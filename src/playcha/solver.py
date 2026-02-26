@@ -246,8 +246,7 @@ async def resolve_challenge(
                 session.lifetime(),
             )
         else:
-            proxy = req.proxy or settings.default_proxy
-            ctx_mgr, _browser, page = await launch_browser(proxy)
+            ctx_mgr, _context, page = await launch_browser(req.proxy)
             log.debug("Temporary browser launched for request.")
 
         if req.disableMedia:

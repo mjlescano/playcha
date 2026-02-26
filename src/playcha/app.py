@@ -6,7 +6,7 @@ import time
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from . import __version__
@@ -16,6 +16,7 @@ from .dtos import (
     STATUS_OK,
     HealthResponse,
     IndexResponse,
+    ProxyRequest,
     V1Request,
     V1Response,
 )
@@ -24,15 +25,14 @@ from .solver import resolve_challenge
 
 log = logging.getLogger(__name__)
 
-SESSIONS = SessionsStorage()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    app.state.sessions = SessionsStorage()
     log.info("Playcha %s starting", __version__)
     yield
     log.info("Shutting down — destroying all sessions...")
-    await SESSIONS.destroy_all()
+    await app.state.sessions.destroy_all()
 
 
 app = FastAPI(title="Playcha", version=__version__, lifespan=lifespan)
@@ -58,12 +58,12 @@ async def health():
 
 
 @app.post("/v1")
-async def controller_v1(req: V1Request):
+async def controller_v1(req: V1Request, request: Request):
     start_ts = int(time.time() * 1000)
     log.info("Incoming request => POST /v1 cmd=%s", req.cmd)
 
     try:
-        res = await _handle_v1(req)
+        res = await _handle_v1(req, request.app.state.sessions)
     except Exception as e:
         log.error("Error handling request: %s", e, exc_info=True)
         res = V1Response(status=STATUS_ERROR, message=f"Error: {e}")
@@ -84,29 +84,26 @@ async def controller_v1(req: V1Request):
 # ---------------------------------------------------------------------------
 
 
-async def _handle_v1(req: V1Request) -> V1Response:
+async def _handle_v1(req: V1Request, sessions: SessionsStorage) -> V1Response:
     if not req.cmd:
         raise Exception("Request parameter 'cmd' is mandatory.")
 
-    # Apply default proxy from env if not provided in request
     if req.proxy is None and settings.default_proxy:
-        from .dtos import ProxyRequest
-
         req.proxy = ProxyRequest(**settings.default_proxy)
 
     if req.maxTimeout < 1:
         req.maxTimeout = 60000
 
     if req.cmd == "sessions.create":
-        return await _cmd_sessions_create(req)
+        return await _cmd_sessions_create(req, sessions)
     if req.cmd == "sessions.list":
-        return await _cmd_sessions_list(req)
+        return await _cmd_sessions_list(sessions)
     if req.cmd == "sessions.destroy":
-        return await _cmd_sessions_destroy(req)
+        return await _cmd_sessions_destroy(req, sessions)
     if req.cmd == "request.get":
-        return await _cmd_request_get(req)
+        return await _cmd_request_get(req, sessions)
     if req.cmd == "request.post":
-        return await _cmd_request_post(req)
+        return await _cmd_request_post(req, sessions)
 
     raise Exception(f"Request parameter 'cmd' = '{req.cmd}' is invalid.")
 
@@ -116,8 +113,8 @@ async def _handle_v1(req: V1Request) -> V1Response:
 # ---------------------------------------------------------------------------
 
 
-async def _cmd_sessions_create(req: V1Request) -> V1Response:
-    session, fresh = await SESSIONS.create(session_id=req.session, proxy=req.proxy)
+async def _cmd_sessions_create(req: V1Request, sessions: SessionsStorage) -> V1Response:
+    session, fresh = await sessions.create(session_id=req.session, proxy=req.proxy)
     return V1Response(
         status=STATUS_OK,
         message="Session created successfully." if fresh else "Session already exists.",
@@ -125,18 +122,18 @@ async def _cmd_sessions_create(req: V1Request) -> V1Response:
     )
 
 
-async def _cmd_sessions_list(req: V1Request) -> V1Response:
+async def _cmd_sessions_list(sessions: SessionsStorage) -> V1Response:
     return V1Response(
         status=STATUS_OK,
         message="",
-        sessions=SESSIONS.session_ids(),
+        sessions=sessions.session_ids(),
     )
 
 
-async def _cmd_sessions_destroy(req: V1Request) -> V1Response:
+async def _cmd_sessions_destroy(req: V1Request, sessions: SessionsStorage) -> V1Response:
     if not req.session:
         raise Exception("Request parameter 'session' is mandatory for sessions.destroy.")
-    existed = await SESSIONS.destroy(req.session)
+    existed = await sessions.destroy(req.session)
     if not existed:
         raise Exception("The session doesn't exist.")
     return V1Response(
@@ -150,20 +147,20 @@ async def _cmd_sessions_destroy(req: V1Request) -> V1Response:
 # ---------------------------------------------------------------------------
 
 
-async def _cmd_request_get(req: V1Request) -> V1Response:
+async def _cmd_request_get(req: V1Request, sessions: SessionsStorage) -> V1Response:
     if not req.url:
         raise Exception("Request parameter 'url' is mandatory in 'request.get' command.")
     if req.postData:
         raise Exception("Cannot use 'postData' when sending a GET request.")
-    return await resolve_challenge(req, "GET", SESSIONS)
+    return await resolve_challenge(req, "GET", sessions)
 
 
-async def _cmd_request_post(req: V1Request) -> V1Response:
+async def _cmd_request_post(req: V1Request, sessions: SessionsStorage) -> V1Response:
     if not req.url:
         raise Exception("Request parameter 'url' is mandatory in 'request.post' command.")
     if not req.postData:
         raise Exception("Request parameter 'postData' is mandatory in 'request.post' command.")
-    return await resolve_challenge(req, "POST", SESSIONS)
+    return await resolve_challenge(req, "POST", sessions)
 
 
 # ---------------------------------------------------------------------------

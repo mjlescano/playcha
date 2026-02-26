@@ -32,23 +32,22 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download the Camoufox browser binary
 RUN python -m camoufox fetch
 
-# Create non-root user
+# Create non-root user and move Camoufox cache to its home
 RUN useradd --home-dir /app --shell /bin/sh playcha \
-    && chown -R playcha:playcha /app \
-    && chown -R playcha:playcha /root/.cache/camoufox 2>/dev/null; \
-       mkdir -p /home/playcha/.cache && \
-       cp -r /root/.cache/camoufox /home/playcha/.cache/camoufox 2>/dev/null; \
-       chown -R playcha:playcha /home/playcha
+    && mkdir -p /app/.cache \
+    && cp -r /root/.cache/camoufox /app/.cache/camoufox \
+    && chown -R playcha:playcha /app
 
 # Copy source
 COPY src/ src/
 
-USER playcha
-
+ENV PYTHONPATH=/app/src
 ENV PORT=8191
 ENV HOST=0.0.0.0
 ENV LOG_LEVEL=info
 ENV HEADLESS=true
+
+USER playcha
 
 EXPOSE 8191
 

@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "FlareSolverr-compatible API using Playwright + Camoufox for challenge solving"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
@@ -17,7 +17,6 @@ dependencies = [
     "camoufox[geoip]",
     "playwright-captcha",
     "2captcha-python-async",
-    "aiofiles",
 ]
 
 [project.optional-dependencies]
@@ -35,7 +34,7 @@ binary = [
 where = ["src"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 src = ["src"]
 line-length = 100
 

@@ -5,4 +5,3 @@ pydantic-settings
 camoufox[geoip]
 playwright-captcha
 2captcha-python-async
-aiofiles

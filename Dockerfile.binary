@@ -73,7 +73,7 @@ RUN cp -r /root/.cache/camoufox /dist/camoufox
 # =============================================================================
 # Stage 2 — Minimal runtime image (optional verification)
 # =============================================================================
-FROM python:3.12-slim-bookworm AS runtime
+FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libgtk-3-0 \
@@ -101,9 +101,9 @@ COPY --from=builder /dist/playcha /opt/playcha
 COPY --from=builder /dist/camoufox /opt/camoufox
 
 RUN useradd --home-dir /opt/playcha --shell /bin/sh playcha \
-    && mkdir -p /home/playcha/.cache \
-    && ln -s /opt/camoufox /home/playcha/.cache/camoufox \
-    && chown -R playcha:playcha /opt/playcha /home/playcha
+    && mkdir -p /opt/playcha/.cache \
+    && ln -s /opt/camoufox /opt/playcha/.cache/camoufox \
+    && chown -R playcha:playcha /opt/playcha
 
 USER playcha
 
