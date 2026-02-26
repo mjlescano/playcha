@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.sessions = SessionsStorage()
-    log.info("Playcha %s starting", __version__)
+    log.info("Listening on %s:%d", settings.host, settings.port)
     yield
     log.info("Shutting down — destroying all sessions...")
     await app.state.sessions.destroy_all()
@@ -170,23 +170,30 @@ async def _cmd_request_post(req: V1Request, sessions: SessionsStorage) -> V1Resp
 
 def main() -> None:
     log_level = settings.log_level.upper()
+
     logging.basicConfig(
         format="%(asctime)s %(levelname)-8s %(message)s",
         level=log_level,
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
     log.info("Playcha %s", __version__)
-    log.info("Listening on %s:%d", settings.host, settings.port)
 
-    uvicorn.run(
+    config = uvicorn.Config(
         app,
         host=settings.host,
         port=settings.port,
-        log_level=log_level.lower(),
+        log_config=None,
     )
+
+    server = uvicorn.Server(config)
+
+    config.configure_logging()
+    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+
+    server.run()
 
 
 if __name__ == "__main__":

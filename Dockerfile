@@ -62,6 +62,9 @@ RUN PYTHONPATH=src pyinstaller \
         --hidden-import uvicorn.lifespan.on \
         --collect-all playwright_captcha \
         --collect-all camoufox \
+        --collect-all browserforge \
+        --collect-all apify_fingerprint_datapoints \
+        --collect-all language_tags \
         entrypoint.py
 
 RUN mkdir -p /dist && mv dist/playcha /dist/playcha
