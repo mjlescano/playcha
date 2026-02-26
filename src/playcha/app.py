@@ -193,7 +193,10 @@ def main() -> None:
     logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
-    server.run()
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
