@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import logging
 from typing import Any
 
@@ -36,6 +37,14 @@ ACCESS_DENIED_SELECTORS = [
 CHALLENGE_TITLES = [
     "Just a moment...",
     "DDoS-Guard",
+]
+
+# Cloudflare localizes the challenge page title.  Rather than maintaining
+# translations for every locale, match the page by selectors as the primary
+# signal and treat the title as a secondary hint.
+CHALLENGE_TITLE_FRAGMENTS = [
+    "moment",
+    "ddos",
 ]
 
 CHALLENGE_SELECTORS = [
@@ -74,6 +83,17 @@ async def _elements_exist(page: Any, selectors: list[str]) -> bool:
     return False
 
 
+def _title_is_challenge(title: str | None) -> bool:
+    """Return True if *title* matches a known Cloudflare challenge title."""
+    if not title:
+        return False
+    lower = title.lower()
+    for t in CHALLENGE_TITLES:
+        if lower == t.lower():
+            return True
+    return any(fragment in lower for fragment in CHALLENGE_TITLE_FRAGMENTS)
+
+
 async def _detect_challenge(page: Any) -> bool:
     title = await page.title()
     for t in ACCESS_DENIED_TITLES:
@@ -88,10 +108,9 @@ async def _detect_challenge(page: Any) -> bool:
             "Probably your IP is banned for this site, check in your web browser."
         )
 
-    for t in CHALLENGE_TITLES:
-        if title and title.lower() == t.lower():
-            log.info("Challenge detected. Title: %s", title)
-            return True
+    if _title_is_challenge(title):
+        log.info("Challenge detected. Title: %s", title)
+        return True
     if await _elements_exist(page, CHALLENGE_SELECTORS):
         log.info("Challenge detected via selector.")
         return True
@@ -104,11 +123,18 @@ async def _detect_turnstile(page: Any) -> bool:
 
 
 async def _challenge_still_present(page: Any) -> bool:
-    """Check whether a Cloudflare challenge page is still showing."""
-    title = await page.title()
-    for t in CHALLENGE_TITLES:
-        if title and title.lower() == t.lower():
-            return True
+    """Check whether a Cloudflare challenge page is still showing.
+
+    A destroyed execution context (navigation in progress) is treated as
+    "challenge gone" because it means the page is redirecting away from the
+    challenge screen.
+    """
+    try:
+        title = await page.title()
+    except Exception:
+        return False
+    if _title_is_challenge(title):
+        return True
     return await _elements_exist(page, CHALLENGE_SELECTORS)
 
 
@@ -124,31 +150,6 @@ async def _wait_challenge_solved(page: Any, timeout_s: float) -> None:
 
 CF_IFRAME_SELECTOR = 'iframe[src*="challenges.cloudflare.com"]'
 
-
-async def _wait_for_challenge_ready(page: Any, timeout_s: float) -> bool:
-    """Wait for the CF challenge iframe to appear, or for the challenge to auto-solve.
-
-    Returns True if the challenge needs interactive solving (iframe appeared),
-    False if the challenge resolved itself (JS-only challenge or timed out without iframe).
-    """
-    deadline = asyncio.get_event_loop().time() + timeout_s
-    while asyncio.get_event_loop().time() < deadline:
-        if not await _challenge_still_present(page):
-            log.debug("Challenge auto-solved (JS-only challenge).")
-            return False
-        try:
-            iframe = await page.query_selector(CF_IFRAME_SELECTOR)
-            if iframe:
-                log.debug("CF challenge iframe found in DOM.")
-                return True
-        except Exception:
-            pass
-        await asyncio.sleep(1)
-    if not await _challenge_still_present(page):
-        log.debug("Challenge resolved during wait.")
-        return False
-    log.debug("No CF iframe appeared within %ds, challenge still present.", timeout_s)
-    return False
 
 
 async def _extract_cookies(page: Any) -> list[CookieResponse]:
@@ -235,10 +236,9 @@ async def _get_api_solver(page: Any) -> Any:
 
 def _guess_captcha_type(page_title: str, has_turnstile: bool) -> CaptchaType:
     """Best-effort guess of captcha type from page signals."""
-    title_lower = (page_title or "").lower()
-    if "just a moment" in title_lower or has_turnstile:
-        if has_turnstile:
-            return CaptchaType.CLOUDFLARE_TURNSTILE
+    if has_turnstile:
+        return CaptchaType.CLOUDFLARE_TURNSTILE
+    if _title_is_challenge(page_title):
         return CaptchaType.CLOUDFLARE_INTERSTITIAL
     return CaptchaType.CLOUDFLARE_INTERSTITIAL
 
@@ -248,77 +248,95 @@ def _guess_captcha_type(page_title: str, has_turnstile: bool) -> CaptchaType:
 # ---------------------------------------------------------------------------
 
 
-async def _solve_challenge(page: Any, timeout_s: float) -> str | None:
+async def _solve_challenge(
+    page: Any, timeout_s: float, solver: Any
+) -> str | None:
     """Handle a detected Cloudflare challenge.
 
-    Waits for a Turnstile iframe to appear (interactive challenge) or for
-    the challenge to auto-solve (JS-only challenge).  When an iframe is
-    found, the configured solver is used.  JS-only challenges are given the
-    full timeout to resolve on their own.
+    The solver context must already be entered (init scripts registered).
+    Reloads the page so init scripts execute before Cloudflare's challenge
+    JS, then uses a unified polling loop that watches for:
+      - auto-solve (JS-only challenge completed the computation)
+      - interactive Turnstile iframe appeared (needs solver click/API)
 
     Returns a turnstile token string if one was captured, else None.
+    Raises if the challenge is never solved within *timeout_s*.
     """
-    turnstile_token: str | None = None
-    iframe_wait = min(timeout_s / 2, 15)
-
-    needs_solver = await _wait_for_challenge_ready(page, iframe_wait)
-    if not needs_solver:
-        return None
-
     has_turnstile = await _detect_turnstile(page)
     captcha_type = _guess_captcha_type(await page.title(), has_turnstile)
 
+    deadline = asyncio.get_event_loop().time() + timeout_s
+
+    log.info("Waiting for challenge to auto-solve or show interactive element...")
+    iframe_found = False
+    while asyncio.get_event_loop().time() < deadline:
+        if not await _challenge_still_present(page):
+            log.debug("Challenge auto-solved.")
+            await asyncio.sleep(2)
+            return None
+
+        # Check DOM for Turnstile iframe
+        try:
+            el = await page.query_selector(CF_IFRAME_SELECTOR)
+            if el:
+                log.debug("CF iframe found in DOM.")
+                iframe_found = True
+                break
+        except Exception:
+            pass
+
+        # Check Playwright frames API (sees cross-origin frames)
+        try:
+            for frame in page.frames:
+                if "challenges.cloudflare.com" in frame.url:
+                    log.debug("CF frame found via Playwright API: %s", frame.url)
+                    iframe_found = True
+                    break
+        except Exception:
+            pass
+        if iframe_found:
+            break
+
+        await asyncio.sleep(1)
+
+    if not iframe_found:
+        if not await _challenge_still_present(page):
+            await asyncio.sleep(2)
+            return None
+        raise Exception(
+            f"Challenge not solved within {timeout_s}s timeout "
+            "(no interactive element found, JS challenge did not complete)."
+        )
+
+    # Interactive challenge — invoke the solver
+    remaining = max(deadline - asyncio.get_event_loop().time(), 5)
+    log.info("Interactive challenge detected, invoking solver (%.0fs remaining)...", remaining)
+    try:
+        result = await asyncio.wait_for(
+            solver.solve_captcha(
+                captcha_container=page,
+                captcha_type=captcha_type,
+            ),
+            timeout=remaining,
+        )
+        if isinstance(result, str):
+            return result
+    except TimeoutError as err:
+        raise Exception(f"Timeout after {timeout_s}s solving challenge.") from err
+
+    return None
+
+
+async def _build_solver(page: Any) -> Any:
+    """Build the configured solver for the given page."""
     if settings.captcha_solver == CaptchaSolverType.CLICK:
-        solver = ClickSolver(
+        return ClickSolver(
             framework=FRAMEWORK, page=page, max_attempts=5, attempt_delay=8,
         )
-        async with solver:
-            # Reload so the init scripts (unlockShadowRoot etc.) run
-            # before the Cloudflare challenge JS executes.
-            log.debug("Reloading page so init scripts run before CF challenge JS...")
-            await page.reload(wait_until="domcontentloaded")
-
-            # After reload, wait again for the iframe or auto-solve
-            needs_solver = await _wait_for_challenge_ready(page, iframe_wait)
-            if needs_solver:
-                try:
-                    await asyncio.wait_for(
-                        solver.solve_captcha(
-                            captcha_container=page,
-                            captcha_type=captcha_type,
-                        ),
-                        timeout=timeout_s,
-                    )
-                except TimeoutError as err:
-                    raise Exception(
-                        f"Timeout after {timeout_s}s solving challenge."
-                    ) from err
-    else:
-        api_solver = await _get_api_solver(page)
-        if api_solver is None:
-            raise Exception(f"No solver configured for type {settings.captcha_solver}")
-        async with api_solver:
-            log.debug("Reloading page so init scripts run before CF challenge JS...")
-            await page.reload(wait_until="domcontentloaded")
-
-            needs_solver = await _wait_for_challenge_ready(page, iframe_wait)
-            if needs_solver:
-                try:
-                    result = await asyncio.wait_for(
-                        api_solver.solve_captcha(
-                            captcha_container=page,
-                            captcha_type=captcha_type,
-                        ),
-                        timeout=timeout_s,
-                    )
-                    if isinstance(result, str):
-                        turnstile_token = result
-                except TimeoutError as err:
-                    raise Exception(
-                        f"Timeout after {timeout_s}s solving challenge."
-                    ) from err
-
-    return turnstile_token
+    api_solver = await _get_api_solver(page)
+    if api_solver is None:
+        raise Exception(f"No solver configured for type {settings.captcha_solver}")
+    return api_solver
 
 
 async def resolve_challenge(
@@ -331,6 +349,7 @@ async def resolve_challenge(
     ctx_mgr = None
     page = None
     session_id: str | None = None
+    solver = None
     try:
         if req.session:
             from datetime import timedelta
@@ -352,6 +371,11 @@ async def resolve_challenge(
         if req.disableMedia:
             await _block_media(page)
 
+        # Prepare the solver before navigation so its init scripts
+        # (unlockShadowRoot, etc.) run on the first page load.
+        solver = await _build_solver(page)
+        await solver.__aenter__()
+
         # Navigate
         if method == "POST" and req.postData:
             await _navigate_post(page, req.url, req.postData)
@@ -372,13 +396,16 @@ async def resolve_challenge(
         turnstile_token: str | None = None
 
         if challenge_found:
-            turnstile_token = await _solve_challenge(page, timeout_s)
+            turnstile_token = await _solve_challenge(page, timeout_s, solver)
 
-            # Wait for challenge artifacts to disappear
-            try:
-                await _wait_challenge_solved(page, min(timeout_s, 15))
-            except Exception:
-                log.warning("Challenge selectors did not fully clear.")
+            # Final check: ensure the challenge page is actually gone
+            if await _challenge_still_present(page):
+                try:
+                    await _wait_challenge_solved(page, min(timeout_s, 15))
+                except Exception as exc:
+                    raise Exception(
+                        "Challenge was not solved — the page still shows the challenge screen."
+                    ) from exc
 
             log.info("Challenge solved!")
             message = "Challenge solved!"
@@ -419,6 +446,9 @@ async def resolve_challenge(
         return V1Response(status=STATUS_OK, message=message, solution=solution)
 
     finally:
+        if solver is not None:
+            with contextlib.suppress(Exception):
+                await solver.__aexit__(None, None, None)
         if ctx_mgr is not None:
             try:
                 await ctx_mgr.__aexit__(None, None, None)

@@ -97,6 +97,16 @@ async def launch_browser(
     if pw_proxy:
         kwargs["proxy"] = pw_proxy
 
+    # Auto-match geolocation to the exit IP when the geoip extra is installed.
+    # This prevents Cloudflare from flagging timezone/locale mismatches.
+    try:
+        from camoufox.locale import geoip_allowed
+
+        geoip_allowed()
+        kwargs["geoip"] = True
+    except Exception:
+        pass
+
     ctx_mgr = AsyncCamoufox(**kwargs)
     context = await ctx_mgr.__aenter__()
     page = await context.new_page()
