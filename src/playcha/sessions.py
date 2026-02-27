@@ -141,7 +141,14 @@ class _PatchrightContextManager:
 async def _launch_patchright(
     proxy: ProxyRequest | dict | None = None,
 ) -> tuple[Any, Any, Any]:
-    """Launch a Patchright (Chromium) browser and return (context_manager, context, page)."""
+    """Launch a Patchright (Chromium) browser and return (context_manager, context, page).
+
+    Patchright has a known bug where ``page.add_init_script`` breaks DNS
+    resolution.  We work around this by monkey-patching the method to
+    collect scripts, then exposing them on ``page._patchright_init_scripts``
+    so they can be injected via ``page.evaluate`` after each navigation.
+    See :func:`inject_patchright_init_scripts`.
+    """
     try:
         from patchright.async_api import async_playwright
     except ImportError as err:
@@ -152,7 +159,6 @@ async def _launch_patchright(
     pw = await async_playwright().start()
 
     launch_kwargs: dict[str, Any] = {
-        "channel": "chrome",
         "headless": settings.headless,
     }
 
@@ -164,8 +170,30 @@ async def _launch_patchright(
     context = await browser.new_context()
     page = await context.new_page()
 
+    _init_scripts: list[str] = []
+
+    async def _fake_add_init_script(script: str, **_kwargs: Any) -> None:
+        _init_scripts.append(script)
+
+    page.add_init_script = _fake_add_init_script  # type: ignore[assignment]
+    page._patchright_init_scripts = _init_scripts  # type: ignore[attr-defined]
+
     ctx_mgr = _PatchrightContextManager(pw, browser)
     return ctx_mgr, context, page
+
+
+async def inject_patchright_init_scripts(page: Any) -> None:
+    """Inject deferred init scripts collected by the Patchright workaround.
+
+    Must be called after every ``page.goto`` / ``page.reload`` when using the
+    Patchright backend so that ``unlockShadowRoot.js`` (and any other init
+    scripts added by the solver) take effect.
+    """
+    scripts: list[str] | None = getattr(page, "_patchright_init_scripts", None)
+    if not scripts:
+        return
+    for script in scripts:
+        await page.evaluate(script)
 
 
 # ---------------------------------------------------------------------------

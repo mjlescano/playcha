@@ -16,7 +16,7 @@ from .dtos import (
     V1Request,
     V1Response,
 )
-from .sessions import SessionsStorage, launch_browser
+from .sessions import SessionsStorage, inject_patchright_init_scripts, launch_browser
 
 log = logging.getLogger(__name__)
 
@@ -388,6 +388,7 @@ async def resolve_challenge(
             await _navigate_post(page, req.url, req.postData)
         else:
             await page.goto(req.url, wait_until="domcontentloaded")
+        await inject_patchright_init_scripts(page)
 
         # Apply cookies if provided, then reload
         if req.cookies:
@@ -397,6 +398,7 @@ async def resolve_challenge(
                 await _navigate_post(page, req.url, req.postData)
             else:
                 await page.goto(req.url, wait_until="domcontentloaded")
+            await inject_patchright_init_scripts(page)
 
         # Detect and solve challenge
         challenge_found = await _detect_challenge(page)
