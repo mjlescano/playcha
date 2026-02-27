@@ -8,7 +8,7 @@ from typing import Any
 
 from playwright_captcha import CaptchaType, ClickSolver, FrameworkType
 
-from .config import CaptchaSolverType, settings
+from .config import BrowserType, CaptchaSolverType, settings
 from .dtos import (
     STATUS_OK,
     CookieResponse,
@@ -64,7 +64,14 @@ TURNSTILE_SELECTORS = [
     "input[name='cf-turnstile-response']",
 ]
 
-FRAMEWORK = FrameworkType.CAMOUFOX
+_FRAMEWORK_MAP = {
+    BrowserType.CAMOUFOX: FrameworkType.CAMOUFOX,
+    BrowserType.PATCHRIGHT: FrameworkType.PATCHRIGHT,
+}
+
+
+def _get_framework() -> FrameworkType:
+    return _FRAMEWORK_MAP[settings.browser]
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +210,7 @@ async def _get_api_solver(page: Any) -> Any:
         if not settings.two_captcha_api_key:
             raise Exception("TWO_CAPTCHA_API_KEY is required for twocaptcha solver.")
         client = AsyncTwoCaptcha(settings.two_captcha_api_key)
-        return TwoCaptchaSolver(framework=FRAMEWORK, page=page, async_two_captcha_client=client)
+        return TwoCaptchaSolver(framework=_get_framework(), page=page, async_two_captcha_client=client)
 
     if solver_type == CaptchaSolverType.TENCAPTCHA:
         if not settings.ten_captcha_api_key:
@@ -216,7 +223,7 @@ async def _get_api_solver(page: Any) -> Any:
         except ImportError as err:
             raise Exception("Install tencaptcha package for tencaptcha solver.") from err
         client = AsyncTenCaptcha(settings.ten_captcha_api_key)
-        return TenCaptchaSolver(framework=FRAMEWORK, page=page, async_ten_captcha_client=client)
+        return TenCaptchaSolver(framework=_get_framework(), page=page, async_ten_captcha_client=client)
 
     if solver_type == CaptchaSolverType.CAPTCHAAI:
         if not settings.captcha_ai_api_key:
@@ -229,7 +236,7 @@ async def _get_api_solver(page: Any) -> Any:
         except ImportError as err:
             raise Exception("Install captchaai package for captchaai solver.") from err
         client = AsyncCaptchaAI(settings.captcha_ai_api_key)
-        return CaptchaAISolver(framework=FRAMEWORK, page=page, async_captcha_ai_client=client)
+        return CaptchaAISolver(framework=_get_framework(), page=page, async_captcha_ai_client=client)
 
     return None
 
@@ -331,7 +338,7 @@ async def _build_solver(page: Any) -> Any:
     """Build the configured solver for the given page."""
     if settings.captcha_solver == CaptchaSolverType.CLICK:
         return ClickSolver(
-            framework=FRAMEWORK, page=page, max_attempts=5, attempt_delay=8,
+            framework=_get_framework(), page=page, max_attempts=5, attempt_delay=8,
         )
     api_solver = await _get_api_solver(page)
     if api_solver is None:

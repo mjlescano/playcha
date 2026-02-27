@@ -9,19 +9,12 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from camoufox.async_api import AsyncCamoufox
-from playwright_captcha.utils.camoufox_add_init_script.add_init_script import (
-    get_addon_path,
-)
-
-from .config import settings
+from .config import BrowserType, settings
 
 if TYPE_CHECKING:
     from .dtos import ProxyRequest
 
 log = logging.getLogger(__name__)
-
-ADDON_PATH = get_addon_path()
 
 
 def _build_proxy_arg(proxy: ProxyRequest | dict | None) -> dict[str, Any] | None:
@@ -57,7 +50,6 @@ def _resolve_camoufox_path() -> str | None:
         return None
     if os.path.isfile(path):
         return path
-    # If it's a directory, look for the binary inside it
     for candidate in ("firefox", "firefox.exe", "camoufox", "camoufox.exe"):
         binary = os.path.join(path, candidate)
         if os.path.isfile(binary):
@@ -66,16 +58,31 @@ def _resolve_camoufox_path() -> str | None:
     return None
 
 
-async def launch_browser(
+# ---------------------------------------------------------------------------
+# Camoufox launcher
+# ---------------------------------------------------------------------------
+
+
+async def _launch_camoufox(
     proxy: ProxyRequest | dict | None = None,
 ) -> tuple[Any, Any, Any]:
-    """Launch a Camoufox browser and return (context_manager, context, page).
+    """Launch a Camoufox browser and return (context_manager, context, page)."""
+    try:
+        from camoufox.async_api import AsyncCamoufox
+    except ImportError as err:
+        raise RuntimeError(
+            "Camoufox is not installed. Install it with: pip install playcha[camoufox]"
+        ) from err
 
-    The caller is responsible for closing via ``context_manager.__aexit__``.
-    ``AsyncCamoufox.__aenter__`` returns a ``BrowserContext`` with stealth
-    settings already applied, so we use it directly instead of creating a
-    second context.
-    """
+    try:
+        from playwright_captcha.utils.camoufox_add_init_script.add_init_script import (
+            get_addon_path,
+        )
+
+        addon_path = os.path.abspath(get_addon_path())
+    except Exception:
+        addon_path = None
+
     headless: bool | str = settings.headless
     if headless and sys.platform == "linux":
         headless = "virtual"
@@ -87,8 +94,10 @@ async def launch_browser(
         "disable_coop": True,
         "i_know_what_im_doing": True,
         "config": {"forceScopeAccess": True},
-        "addons": [os.path.abspath(ADDON_PATH)],
     }
+
+    if addon_path:
+        kwargs["addons"] = [addon_path]
 
     exe_path = _resolve_camoufox_path()
     if exe_path:
@@ -98,8 +107,6 @@ async def launch_browser(
     if pw_proxy:
         kwargs["proxy"] = pw_proxy
 
-    # Auto-match geolocation to the exit IP when the geoip extra is installed.
-    # This prevents Cloudflare from flagging timezone/locale mismatches.
     try:
         from camoufox.locale import geoip_allowed
 
@@ -112,6 +119,71 @@ async def launch_browser(
     context = await ctx_mgr.__aenter__()
     page = await context.new_page()
     return ctx_mgr, context, page
+
+
+# ---------------------------------------------------------------------------
+# Patchright launcher
+# ---------------------------------------------------------------------------
+
+
+class _PatchrightContextManager:
+    """Wraps the Patchright playwright + browser lifecycle for cleanup."""
+
+    def __init__(self, playwright: Any, browser: Any) -> None:
+        self._playwright = playwright
+        self._browser = browser
+
+    async def __aexit__(self, *args: Any) -> None:
+        await self._browser.close()
+        await self._playwright.stop()
+
+
+async def _launch_patchright(
+    proxy: ProxyRequest | dict | None = None,
+) -> tuple[Any, Any, Any]:
+    """Launch a Patchright (Chromium) browser and return (context_manager, context, page)."""
+    try:
+        from patchright.async_api import async_playwright
+    except ImportError as err:
+        raise RuntimeError(
+            "Patchright is not installed. Install it with: pip install playcha[patchright]"
+        ) from err
+
+    pw = await async_playwright().start()
+
+    launch_kwargs: dict[str, Any] = {
+        "channel": "chrome",
+        "headless": settings.headless,
+    }
+
+    pw_proxy = _build_proxy_arg(proxy)
+    if pw_proxy:
+        launch_kwargs["proxy"] = pw_proxy
+
+    browser = await pw.chromium.launch(**launch_kwargs)
+    context = await browser.new_context()
+    page = await context.new_page()
+
+    ctx_mgr = _PatchrightContextManager(pw, browser)
+    return ctx_mgr, context, page
+
+
+# ---------------------------------------------------------------------------
+# Public launcher (dispatches based on settings.browser)
+# ---------------------------------------------------------------------------
+
+
+async def launch_browser(
+    proxy: ProxyRequest | dict | None = None,
+) -> tuple[Any, Any, Any]:
+    """Launch a browser and return (context_manager, context, page).
+
+    The caller is responsible for closing via ``context_manager.__aexit__``.
+    The browser backend is selected by the ``BROWSER`` setting.
+    """
+    if settings.browser == BrowserType.PATCHRIGHT:
+        return await _launch_patchright(proxy)
+    return await _launch_camoufox(proxy)
 
 
 @dataclass

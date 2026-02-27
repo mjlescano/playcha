@@ -1,6 +1,6 @@
 # Playcha
 
-Wrapper proxy server for [https://github.com/techinz/playwright-captcha](https://github.com/techinz/playwright-captcha), used for bypassing Cloudflare and other browser challenges, built on **Playwright + Camoufox**.
+Wrapper proxy server for [https://github.com/techinz/playwright-captcha](https://github.com/techinz/playwright-captcha), used for bypassing Cloudflare and other browser challenges, built on **Playwright** with support for **Camoufox** (stealth Firefox) and **Patchright** (stealth Chromium).
 
 Playcha is [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) compatible proxy server drop-in replacement — same `POST /v1` interface, same request/response shapes — so migrating from FlareSolverr is a one-line URL change.
 
@@ -29,20 +29,34 @@ docker run -d \
 
 ### From source
 
-Requires Python 3.12+.
+Requires Python 3.12+. Install with the browser backend you want:
+
+```bash
+# Camoufox (stealth Firefox) — default
+pip install -e ".[camoufox]"
+python -m camoufox fetch
+
+# Patchright (stealth Chromium)
+pip install -e ".[patchright]"
+patchright install chromium
+
+# Both
+pip install -e ".[camoufox,patchright]"
+```
+
+Then start the server:
+
+```bash
+python -m playcha                     # uses BROWSER=camoufox by default
+BROWSER=patchright python -m playcha  # use Patchright instead
+```
+
+Or with Make (uses Camoufox):
 
 ```bash
 make install          # install dependencies
 make fetch-browser    # download the Camoufox browser binary
 make dev              # start the server
-```
-
-Or without Make:
-
-```bash
-pip install -r requirements.txt
-python -m camoufox fetch
-python -m playcha
 ```
 
 ## Usage
@@ -152,8 +166,9 @@ All commands are sent as JSON to `POST /v1`.
 | `PORT` | `8191` | Listening port |
 | `HOST` | `0.0.0.0` | Listening interface |
 | `LOG_LEVEL` | `info` | Log verbosity (`debug`, `info`, `warning`, `error`) |
+| `BROWSER` | `camoufox` | Browser backend: `camoufox` (Firefox) or `patchright` (Chromium) |
 | `HEADLESS` | `true` | Run browser in headless mode |
-| `CAMOUFOX_PATH` | *(auto)* | Custom path to Camoufox browser binary |
+| `CAMOUFOX_PATH` | *(auto)* | Custom path to Camoufox browser binary (Camoufox only) |
 | `PROXY_URL` | — | Default proxy URL |
 | `PROXY_USERNAME` | — | Default proxy username |
 | `PROXY_PASSWORD` | — | Default proxy password |
@@ -208,7 +223,7 @@ No code changes needed beyond updating the endpoint URL.
 
 | | FlareSolverr | Playcha |
 |---|---|---|
-| Browser | Chromium + undetected-chromedriver | Camoufox (stealth Firefox) |
+| Browser | Chromium + undetected-chromedriver | Camoufox (stealth Firefox) or Patchright (stealth Chromium) |
 | Automation | Selenium (sync) | Playwright (async) |
 | Captcha solving | Tab-based click heuristics | playwright-captcha library |
 | API solvers | None built-in | 2Captcha, 10Captcha, CaptchaAI |

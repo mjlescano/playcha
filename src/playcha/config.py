@@ -7,6 +7,11 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
+class BrowserType(StrEnum):
+    CAMOUFOX = "camoufox"
+    PATCHRIGHT = "patchright"
+
+
 class CaptchaSolverType(StrEnum):
     CLICK = "click"
     TWOCAPTCHA = "twocaptcha"
@@ -19,6 +24,7 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0")
     log_level: str = Field(default="info")
 
+    browser: BrowserType = Field(default=BrowserType.CAMOUFOX)
     headless: bool = Field(default=True)
     camoufox_path: str | None = Field(default=None)
 
