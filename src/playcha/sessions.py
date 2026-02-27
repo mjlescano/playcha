@@ -86,6 +86,7 @@ async def launch_browser(
         "main_world_eval": True,
         "disable_coop": True,
         "i_know_what_im_doing": True,
+        "config": {"forceScopeAccess": True},
         "addons": [os.path.abspath(ADDON_PATH)],
     }
 
